@@ -33,6 +33,12 @@
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
+  <PropertyGroup>
+    <PreBuildEvent>call C:\PreAndPostBuildBats\ChunkManager\deleteCM.bat</PreBuildEvent>
+  </PropertyGroup>
+  <PropertyGroup>
+    <PostBuildEvent>call C:\PreAndPostBuildBats\ChunkManager\moveCM.bat</PostBuildEvent>
+  </PropertyGroup>
   <ItemGroup>
     <Compile Include="ChunkManager.cs" />
     <Compile Include="Tiny Resort Tools\ModWindow.cs" />

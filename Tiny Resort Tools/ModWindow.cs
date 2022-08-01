@@ -11,7 +11,7 @@ namespace TR {
 
         public static GameObject MapCanvas;
 
-        private static GameObject BlankOptionsMenu;
+       // private static GameObject BlankOptionsMenu;
 
         public Image background;
 
@@ -19,6 +19,7 @@ namespace TR {
 
             return;
             
+            /*
             Debug.Log("INITIALIZING MOD WINDOW: " + SceneManager.GetActiveScene().name);
 
             // Creates a canvas object identical to the Dinkum MapCanvas object
@@ -39,7 +40,7 @@ namespace TR {
                     Debug.Log("FOUND OPTION WINDOW");
                     break;
                 }
-            }
+            }*/
             
         }
 

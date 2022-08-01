@@ -20,19 +20,19 @@ namespace TR {
 
         public static List<Vector2> ActiveChunks = new List<Vector2>();
         public static Vector3 currentPosition;
-        
+
         public void Awake() {
             Harmony harmony = new Harmony(pluginGuid);
             Tools.Initialize(harmony);
             EditActiveChunks();
-            
+
             MethodInfo OnTriggerEnter = AccessTools.Method(typeof(ChunkLoader), "OnTriggerEnter");
             MethodInfo OnTriggerEnterPrefix = AccessTools.Method(typeof(ChunkManager), "OnTriggerEnterPostfix");
             harmony.Patch(OnTriggerEnter, new HarmonyMethod(OnTriggerEnterPrefix));
             MethodInfo OnTriggerExit = AccessTools.Method(typeof(ChunkLoader), "OnTriggerExit");
             MethodInfo OnTriggerExitPrefix = AccessTools.Method(typeof(ChunkManager), "OnTriggerExitPrefix");
             harmony.Patch(OnTriggerExit, new HarmonyMethod(OnTriggerExitPrefix));
-            
+
             MethodInfo updatePrefix = AccessTools.Method(typeof(ChunkManager), "updatePrefix");
             MethodInfo update = AccessTools.Method(typeof(CharInteract), "Update");
             harmony.Patch(update, new HarmonyMethod(updatePrefix));
@@ -50,40 +50,49 @@ namespace TR {
         public static void updatePrefix(CharInteract __instance) {
             if (!__instance.isLocalPlayer) return;
             currentPosition = __instance.transform.position;
+           // currentPosition = __instance.currentlyAttackingPos;
         }
 
         public void Update() {
 
             if (Input.GetKeyDown(KeyCode.F12)) {
-                
+
                 Chunk closest = null;
                 float closestDist = 10000000;
-                
+
                 Debug.Log(WorldManager.manageWorld.chunksInUse.Count + " ACTIVE CHUNKS:");
-                
+
                 for (var i = 0; i < WorldManager.manageWorld.chunksInUse.Count; i++) {
                     var chunk = WorldManager.manageWorld.chunksInUse[i];
-                    var chunkDist = Vector3.Distance(currentPosition, new Vector3(chunk.showingChunkX * 2, currentPosition.y, chunk.showingChunkY * 2));
-                    if (chunkDist < closestDist) {
-                        closest = chunk;
-                        closestDist = chunkDist;
+                    for (var j = 0; j < WorldManager.manageWorld.chunksInUse[i].chunksTiles.GetLength(1); j++) {
+                        for (var k = 0; k < WorldManager.manageWorld.chunksInUse[i].chunksTiles.GetLength(1); k++) {
+                            var tileDistance = Vector3.Distance(currentPosition, chunk.chunksTiles[j, k]._transform.position);
+                            //var chunkDist = Vector3.Distance(currentPosition, new Vector3(chunk.showingChunkX * 2, currentPosition.y, chunk.showingChunkY * 2));
+                            if (tileDistance < closestDist) {
+                                closest = chunk;
+                                closestDist = tileDistance;
+                            }
+                        }
                     }
-                    Debug.Log(chunk.showingChunkX + ", " + chunk.showingChunkY);
+
+                    // Debug.Log(chunk.showingChunkX + ", " + chunk.showingChunkY);
                 }
-                
+
+ 
                 if (closest != null) {
                     Debug.Log("PLAYER POSITION: " + currentPosition.x + ", " + currentPosition.z);
-                    Debug.Log("CLOSEST CHUNK: " + closest.showingChunkX + ", " + closest.showingChunkY);
+                    Debug.Log($"CLOSEST CHUNK: " + closest.showingChunkX + ", " + closest.showingChunkY);
+                    
                     foreach (var tile in closest.chunksTiles) {
-                        var GO = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                        GO.transform.localScale = new Vector3(2, 0.5f, 2);
+                        var GO = GameObject.CreatePrimitive(PrimitiveType.Plane);
+                        GO.transform.localScale = new Vector3(.2f, 10f, .2f);
                         GO.transform.parent = tile.transform;
                         GO.transform.localPosition = new Vector3(0, 1f, 0);
                     }
                 }
-                
+
             }
-            
+
             // giveBackChunks
             // also load when loading into game
             // add selection of chunks to keep active
