@@ -28,10 +28,17 @@ namespace TR {
         public static ConfigEntry<KeyCode> ShowCurrentChunkHotkey;
         private static bool ShowCurrentChunk;
 
+        public static ConfigEntry<KeyCode> ShowChunkGridHotkey;
+        private static bool ShowChunkGrid;
+
+        public GameObject MapGrid;
+        private static bool TogglingChunk;
+
         public void Awake() {
 
-            ShowCurrentChunkHotkey = Config.Bind("Keybinds", "ShowCurrentChunk", KeyCode.F3, "Pressing this key will show mark the current chunk as a square in the world.");
-            
+            ShowCurrentChunkHotkey = Config.Bind("Keybinds", "ShowCurrentChunk", KeyCode.F3, "Pressing this key will show a red overlay on tiles within the player's current grid.");
+            ShowChunkGridHotkey = Config.Bind("Keybinds", "ShowChunkGrid", KeyCode.F4, "Pressing this key will show a grid overlay on the map.");
+
             Harmony harmony = new Harmony(pluginGuid);
             Tools.Initialize(harmony);
             //EditActiveChunks();
@@ -78,7 +85,12 @@ namespace TR {
 
             if (Input.GetKeyDown(ShowCurrentChunkHotkey.Value)) {
                 ShowCurrentChunk = !ShowCurrentChunk;
-                ChunkIndicator.SetActive(ShowCurrentChunk);    
+                ChunkIndicator.SetActive(ShowCurrentChunk);
+            }
+
+            if (Input.GetKeyDown(ShowChunkGridHotkey.Value)) {
+                ShowChunkGrid = !ShowChunkGrid;
+                MapGrid.SetActive(ShowChunkGrid);
             }
             
             if (ShowCurrentChunk) {
@@ -114,6 +126,47 @@ namespace TR {
                 currentChunk.showingChunkY * 2 + 9
             );
             
+        }
+
+        // TODO: Make tiles on map clickable to activate chunks
+        [HarmonyPrefix]
+        public static bool MapUpdatePatch(RenderMap __instance) {
+
+            if (!__instance.mapOpen || !ShowChunkGrid || __instance.selectTeleWindowOpen || __instance.iconSelectorOpen || !InputMaster.input.UISelect()) return true;
+            TogglingChunk = true;
+            //if ((!Inventory.inv.usingMouse || !InputMaster.input.Interact()) && (Inventory.inv.usingMouse || !InputMaster.input.Other())) { return true; }
+            //RectTransformUtility.screen(__instance.mapImage.rectTransform, __instance.mapCursor.transform.position, null, out var _);
+
+            return false;
+
+        }
+
+        // TODO: Make tiles on map clickable to activate chunks
+        [HarmonyPostfix]
+        public static void MapUpdatePostfix(RenderMap __instance) {
+
+            if (!TogglingChunk) return;
+
+            __instance.StopCoroutine("runIconSelector");
+            __instance.iconSelectorOpen = false;
+            __instance.iconSelectorWindow.SetActive(value: false);
+            __instance.mapCursor.setPressing(isPressing: false);
+            
+            Debug.Log("Toggling Chunk");
+            
+            
+            //if ((!Inventory.inv.usingMouse || !InputMaster.input.Interact()) && (Inventory.inv.usingMouse || !InputMaster.input.Other())) { return true; }
+            //RectTransformUtility.screen(__instance.mapImage.rectTransform, __instance.mapCursor.transform.position, null, out var _);
+
+
+        }
+
+        // If showing the chunk grid, ignore interactions with icons in favor of toggling chunks
+        [HarmonyPrefix]
+        public static bool checkForIcon(RenderMap __instance, ref InvButton __result) {
+            if (!ShowChunkGrid) { return true; }
+            __result = null;
+            return false;
         }
 
         [HarmonyPostfix]
