@@ -5,6 +5,7 @@ using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace TR {
 
@@ -21,10 +22,19 @@ namespace TR {
         public static List<Vector2> ActiveChunks = new List<Vector2>();
         public static Vector3 currentPosition;
 
+        public static GameObject ChunkIndicator;
+
+        public static Chunk currentChunk;
+        public static ConfigEntry<KeyCode> ShowCurrentChunkHotkey;
+        private static bool ShowCurrentChunk;
+
         public void Awake() {
+
+            ShowCurrentChunkHotkey = Config.Bind("Keybinds", "ShowCurrentChunk", KeyCode.F3, "Pressing this key will show mark the current chunk as a square in the world.");
+            
             Harmony harmony = new Harmony(pluginGuid);
             Tools.Initialize(harmony);
-            EditActiveChunks();
+            //EditActiveChunks();
 
             MethodInfo OnTriggerEnter = AccessTools.Method(typeof(ChunkLoader), "OnTriggerEnter");
             MethodInfo OnTriggerEnterPrefix = AccessTools.Method(typeof(ChunkManager), "OnTriggerEnterPostfix");
@@ -36,15 +46,26 @@ namespace TR {
             MethodInfo updatePrefix = AccessTools.Method(typeof(ChunkManager), "updatePrefix");
             MethodInfo update = AccessTools.Method(typeof(CharInteract), "Update");
             harmony.Patch(update, new HarmonyMethod(updatePrefix));
+
+            // Creates a chunk indicator
+            ChunkIndicator = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            ChunkIndicator.transform.localScale = new Vector3(20, 0.025f, 20);
+            Destroy(ChunkIndicator.GetComponent<Collider>());
+            var Rend = ChunkIndicator.GetComponent<MeshRenderer>();
+            Rend.shadowCastingMode = ShadowCastingMode.Off;
+            Rend.lightProbeUsage = LightProbeUsage.Off;
+            Rend.material.color = new Color(1, 0, 0, 0.5f);
+            ChunkIndicator.SetActive(ShowCurrentChunk);
+
         }
 
-        public void EditActiveChunks() {
-            Config.Remove(new ConfigDefinition("SavedData", "ActiveChunkCount"));
-            ActiveChunkCount = Config.Bind("SavedData", "ActiveChunkCount", ActiveChunks.Count, "IGNORE SETTING. DO NOT SET MANUALLY.");
-            for (var i = 0; i < ActiveChunksConfig.Count; i++) { Config.Remove(new ConfigDefinition("SavedData", "ActiveChunk" + i)); }
-            for (var i = 0; i < ActiveChunks.Count; i++) { ActiveChunksConfig.Add(Config.Bind("SavedData", "ActiveChunk" + i, ActiveChunks[i], "IGNORE SETTING. DO NOT SET MANUALLY.")); }
-            Config.Save();
-        }
+        // public void EditActiveChunks() {
+        //     Config.Remove(new ConfigDefinition("SavedData", "ActiveChunkCount"));
+        //     ActiveChunkCount = Config.Bind("SavedData", "ActiveChunkCount", ActiveChunks.Count, "IGNORE SETTING. DO NOT SET MANUALLY.");
+        //     for (var i = 0; i < ActiveChunksConfig.Count; i++) { Config.Remove(new ConfigDefinition("SavedData", "ActiveChunk" + i)); }
+        //     for (var i = 0; i < ActiveChunks.Count; i++) { ActiveChunksConfig.Add(Config.Bind("SavedData", "ActiveChunk" + i, ActiveChunks[i], "IGNORE SETTING. DO NOT SET MANUALLY.")); }
+        //     Config.Save();
+        // }
 
         [HarmonyPrefix]
         public static void updatePrefix(CharInteract __instance) {
@@ -55,42 +76,14 @@ namespace TR {
 
         public void Update() {
 
-            if (Input.GetKeyDown(KeyCode.F12)) {
-
-                Chunk closest = null;
-                float closestDist = 10000000;
-
-                Debug.Log(WorldManager.manageWorld.chunksInUse.Count + " ACTIVE CHUNKS:");
-
-                for (var i = 0; i < WorldManager.manageWorld.chunksInUse.Count; i++) {
-                    var chunk = WorldManager.manageWorld.chunksInUse[i];
-                    for (var j = 0; j < WorldManager.manageWorld.chunksInUse[i].chunksTiles.GetLength(1); j++) {
-                        for (var k = 0; k < WorldManager.manageWorld.chunksInUse[i].chunksTiles.GetLength(1); k++) {
-                            var tileDistance = Vector3.Distance(currentPosition, chunk.chunksTiles[j, k]._transform.position);
-                            //var chunkDist = Vector3.Distance(currentPosition, new Vector3(chunk.showingChunkX * 2, currentPosition.y, chunk.showingChunkY * 2));
-                            if (tileDistance < closestDist) {
-                                closest = chunk;
-                                closestDist = tileDistance;
-                            }
-                        }
-                    }
-
-                    // Debug.Log(chunk.showingChunkX + ", " + chunk.showingChunkY);
-                }
-
- 
-                if (closest != null) {
-                    Debug.Log("PLAYER POSITION: " + currentPosition.x + ", " + currentPosition.z);
-                    Debug.Log($"CLOSEST CHUNK: " + closest.showingChunkX + ", " + closest.showingChunkY);
-                    
-                    foreach (var tile in closest.chunksTiles) {
-                        var GO = GameObject.CreatePrimitive(PrimitiveType.Plane);
-                        GO.transform.localScale = new Vector3(.2f, 10f, .2f);
-                        GO.transform.parent = tile.transform;
-                        GO.transform.localPosition = new Vector3(0, 1f, 0);
-                    }
-                }
-
+            if (Input.GetKeyDown(ShowCurrentChunkHotkey.Value)) {
+                ShowCurrentChunk = !ShowCurrentChunk;
+                ChunkIndicator.SetActive(ShowCurrentChunk);    
+            }
+            
+            if (ShowCurrentChunk) {
+                FindCurrentChunk();
+                ShowChunkInWorld();
             }
 
             // giveBackChunks
@@ -98,6 +91,29 @@ namespace TR {
             // add selection of chunks to keep active
             // add visual element
 
+        }
+
+        // Finds which tile the player is currently in
+        private void FindCurrentChunk() {
+            for (var i = 0; i < WorldManager.manageWorld.chunksInUse.Count; i++) {
+                var chunk = WorldManager.manageWorld.chunksInUse[i];
+                if (currentPosition.x >= chunk.showingChunkX * 2 - 1 && currentPosition.x < chunk.showingChunkX * 2 + 19 &&
+                    currentPosition.z >= chunk.showingChunkY * 2 - 1 && currentPosition.z < chunk.showingChunkY * 2 + 19) {
+                    currentChunk = chunk;
+                    break;
+                }
+            }
+        }
+
+        // Draws a "cube" indicating the exact area of the chunk the player is currently in
+        private void ShowChunkInWorld() {
+            if (currentChunk == null) return;
+            ChunkIndicator.transform.position = new Vector3(
+                currentChunk.showingChunkX * 2 + 9,
+                currentPosition.y + 0.005f,
+                currentChunk.showingChunkY * 2 + 9
+            );
+            
         }
 
         [HarmonyPostfix]
