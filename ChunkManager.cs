@@ -7,13 +7,14 @@ using HarmonyLib;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace TR {
+namespace TinyResort {
 
     [BepInPlugin(pluginGuid, pluginName, pluginVersion)]
     public class ChunkManager : BaseUnityPlugin {
 
-        public const string pluginGuid = "tinyresort.dinkum.ChunkManager";
-        public const string pluginName = "Chunk Manager";
+        public static TRPlugin Plugin;
+        public const string pluginName = "ChunkManagement";
+        public const string pluginGuid = "tinyresort.dinkum." + pluginName;
         public const string pluginVersion = "0.1.0";
 
         public static ConfigEntry<int> ActiveChunkCount;
@@ -35,24 +36,16 @@ namespace TR {
         private static bool TogglingChunk;
 
         public void Awake() {
+            
+            Plugin = TRTools.Initialize(this, Logger, 52, pluginGuid, pluginName, pluginVersion);
+            Plugin.QuickPatch(typeof(ChunkLoader), "OnTriggerEnter", typeof(ChunkManager), "OnTriggerEnterPostfix");
+            Plugin.QuickPatch(typeof(ChunkLoader), "OnTriggerExit", typeof(ChunkManager), "OnTriggerExitPrefix");
+            Plugin.QuickPatch(typeof(CharInteract), "Update", typeof(ChunkManager), "updatePrefix");
 
             ShowCurrentChunkHotkey = Config.Bind("Keybinds", "ShowCurrentChunk", KeyCode.F3, "Pressing this key will show a red overlay on tiles within the player's current grid.");
             ShowChunkGridHotkey = Config.Bind("Keybinds", "ShowChunkGrid", KeyCode.F4, "Pressing this key will show a grid overlay on the map.");
 
-            Harmony harmony = new Harmony(pluginGuid);
-            Tools.Initialize(harmony);
             //EditActiveChunks();
-
-            MethodInfo OnTriggerEnter = AccessTools.Method(typeof(ChunkLoader), "OnTriggerEnter");
-            MethodInfo OnTriggerEnterPrefix = AccessTools.Method(typeof(ChunkManager), "OnTriggerEnterPostfix");
-            harmony.Patch(OnTriggerEnter, new HarmonyMethod(OnTriggerEnterPrefix));
-            MethodInfo OnTriggerExit = AccessTools.Method(typeof(ChunkLoader), "OnTriggerExit");
-            MethodInfo OnTriggerExitPrefix = AccessTools.Method(typeof(ChunkManager), "OnTriggerExitPrefix");
-            harmony.Patch(OnTriggerExit, new HarmonyMethod(OnTriggerExitPrefix));
-
-            MethodInfo updatePrefix = AccessTools.Method(typeof(ChunkManager), "updatePrefix");
-            MethodInfo update = AccessTools.Method(typeof(CharInteract), "Update");
-            harmony.Patch(update, new HarmonyMethod(updatePrefix));
 
             // Creates a chunk indicator
             ChunkIndicator = GameObject.CreatePrimitive(PrimitiveType.Cube);
